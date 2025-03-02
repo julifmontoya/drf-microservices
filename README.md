@@ -157,8 +157,9 @@ urlpatterns = [
 ]
 ```
 
-# user_service/urls.py
+
 ```
+# user_service/urls.py
 from django.contrib import admin
 from django.urls import path, include
 
