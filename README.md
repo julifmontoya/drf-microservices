@@ -76,7 +76,7 @@ MIDDLEWARE = [
 Extend Django’s built-in AbstractUser model to customize the user schema:
 
 ```
-# users/models.py
+# user/models.py
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 import uuid
@@ -154,7 +154,7 @@ python manage.py migrate
 
 ### 9.2 Create Serializers
 ```
-# users/serializers.py
+# user/serializers.py
 from rest_framework import serializers
 from user.models import User
 from rest_framework.exceptions import AuthenticationFailed
@@ -202,7 +202,7 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 ### 9.3 Create Views
 ```
-# users/views.py
+# user/views.py
 from rest_framework import status
 from rest_framework.generics import CreateAPIView
 from rest_framework.views import APIView
@@ -248,7 +248,7 @@ class BlacklistRefreshView(APIView):
 
 ### 9.4 Add URL Patterns
 ```
-# users/urls.py
+# user/urls.py
 from django.urls import path
 from user.views import LoginView, ProviderCreate, BlacklistRefreshView
 
@@ -269,4 +269,13 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/users/', include('users.urls')),
 ]
+```
+
+### 9.5 Add user to Admin
+```
+# user/admin.py
+from django.contrib import admin
+from. models import User
+
+admin.site.register(User)
 ```
