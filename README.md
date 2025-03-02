@@ -3,9 +3,11 @@
 This tutorial guides you through setting up a Django-based microservices architecture. We'll cover environment setup, package management, project creation, and essential configurations.
 
 ## 1. Set Up a Virtual Environment on Windows
+```
 python -m venv env
 env\Scripts\activate
 deactivate
+```
 
 ## 2.  Install Required Packages
 pip install djangorestframework python-decouple django-cors-headers gunicorn psycopg2-binary
