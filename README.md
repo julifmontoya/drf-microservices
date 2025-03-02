@@ -59,8 +59,9 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 INSTALLED_APPS = [
     'rest_framework',
+    'rest_framework',
     'corsheaders',
-    'users',
+    'user',
 ]
 
 MIDDLEWARE = [
@@ -76,20 +77,73 @@ Extend Django’s built-in AbstractUser model to customize the user schema:
 
 ```
 # users/models.py
-from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
+import uuid
 
-class User(AbstractUser):
-    phone = models.CharField(max_length=15, blank=True, null=True)
-    address = models.TextField(blank=True, null=True)
+class UserManager(BaseUserManager):
+    def create_user(self, email, password=None, **extra):
+        """Create and return a `User` with an email, username and password."""
+        if not email:
+            raise ValueError('Users Must Have an email address')
+        user = self.model(email=self.normalize_email(email), **extra)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password):
+        """Create and return a `User` with superuser (admin) permissions."""
+        if password is None:
+            raise TypeError('Superusers must have a password.')
+        user = self.create_user(email, password)
+        user.is_superuser = True
+        user.is_staff = True
+        user.save()
+        return user
+
+
+class User(AbstractBaseUser, PermissionsMixin):
+    id = models.UUIDField(default=uuid.uuid4, unique=True, primary_key=True, editable=False)
+    email = models.EmailField(max_length=255, unique=True)
+    is_active = models.BooleanField(default=True)
+    is_verified = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    is_superuser = models.BooleanField(default=False)
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = []
+
+    # Tells Django that the UserManager class defined above should manage
+    # objects of this type.
+    objects = UserManager()
 
     def __str__(self):
-        return self.username
+        return self.email
+
+    class Meta:
+        db_table = "user"
 ```
 
 Update settings.py to use the custom user model:
 ```
-AUTH_USER_MODEL = 'users.User'
+AUTH_USER_MODEL = 'user.User'
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    )
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=120),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': False,
+    'ALGORITHM': 'HS256',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'id',
+}
 ```
 
 Run migrations:
@@ -102,58 +156,106 @@ python manage.py migrate
 ```
 # users/serializers.py
 from rest_framework import serializers
-from .models import User
+from user.models import User
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-class UserSerializer(serializers.ModelSerializer):
+
+class ProviderRegistrationSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(max_length=255, min_length=3)
+    password = serializers.CharField(
+        max_length=20, min_length=6, write_only=True)
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'phone', 'address']
+        fields = ['email', 'password']
+
+    def create(self, validated_data):
+        user = User.objects.create_user(**validated_data)
+        return user
+
+
+class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token['email'] = user.email
+        # try:
+        #     prov=Provider.objects.get(user=user)
+        #     token['prov'] = str(prov.id)
+        # except Provider.DoesNotExist:
+        #     token['prov'] = ""
+        return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        token = self.get_token(self.user)
+
+        # Add info outside the token data['user'] = str(self.user)
+        if self.user.is_superuser:
+            return data
+        elif not self.user.is_verified:
+            raise AuthenticationFailed('Email is not verified')
+        else:
+            return data
 ```
 
 ### 9.3 Create Views
 ```
 # users/views.py
+from rest_framework import status
+from rest_framework.generics import CreateAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
-from django.contrib.auth import authenticate
-from .models import User
-from .serializers import UserSerializer
+from rest_framework.permissions import AllowAny
+from user.serializers import MyTokenObtainPairSerializer, TokenObtainPairSerializer, ProviderRegistrationSerializer
+from django.conf import settings
+from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.db import IntegrityError
 
-class RegisterView(APIView):
-    def post(self, request):
-        serializer = UserSerializer(data=request.data)
-        if serializer.is_valid():
+
+class LoginView(TokenObtainPairView):
+    serializer_class = MyTokenObtainPairSerializer
+
+
+class ProviderCreate(CreateAPIView):
+    serializer_class = ProviderRegistrationSerializer
+    permission_classes = (AllowAny,)
+
+    def post(self, request, *args, **kwargs):
+        try:
+            serializer = ProviderRegistrationSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class LoginView(APIView):
+            tokenData = {
+                "email": request.data["email"], "password": request.data["password"]}
+            tokenSerializer = TokenObtainPairSerializer(data=tokenData)
+            tokenSerializer.is_valid(raise_exception=True)
+
+            return Response(tokenSerializer.validated_data, status=status.HTTP_201_CREATED)
+
+        except IntegrityError:
+            return Response({'error': 'There is already a registered user with this email'}, status=status.HTTP_400_BAD_REQUEST)
+
+class BlacklistRefreshView(APIView):
     def post(self, request):
-        username = request.data.get('username')
-        password = request.data.get('password')
-        user = authenticate(username=username, password=password)
-        if user:
-            return Response({"message": "Login successful"}, status=status.HTTP_200_OK)
-        return Response({"message": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
-
-class ProfileView(APIView):
-    def get(self, request):
-        user = request.user
-        serializer = UserSerializer(user)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        token = RefreshToken(request.data.get('refresh'))
+        token.blacklist()
+        return Response("Success")
 ```
 
 ### 9.4 Add URL Patterns
 ```
 # users/urls.py
 from django.urls import path
-from .views import RegisterView, LoginView, ProfileView
+from user.views import LoginView, ProviderCreate, BlacklistRefreshView
 
 urlpatterns = [
-    path('register/', RegisterView.as_view(), name='register'),
-    path('login/', LoginView.as_view(), name='login'),
-    path('profile/', ProfileView.as_view(), name='profile'),
+    path('login/', LoginView.as_view()),
+    path('signup/', ProviderCreate.as_view()),
+    path('logout/', BlacklistRefreshView.as_view()),
 ]
 ```
 
