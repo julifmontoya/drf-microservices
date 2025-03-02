@@ -279,3 +279,9 @@ from. models import User
 
 admin.site.register(User)
 ```
+
+### 9.6 Superuser+collectstatic
+```
+python manage.py createsuperuser
+python manage.py collectstatic
+```
