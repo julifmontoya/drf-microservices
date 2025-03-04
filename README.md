@@ -600,7 +600,7 @@ def get_authenticated_user_id(request):
 pip install pika
 ```
 
-### 17.3. Configure RabbitMQ Connection
+### 17.3 Configure RabbitMQ Connection
 add to .env:
 
 ```
@@ -638,7 +638,30 @@ def publish_message(queue_name, message):
     connection.close()
 ```
 
-### 17.4. Consume Events in Post Service
+### 17.4 Modify the user vieW to call the producer
+```
+from .utils.rabbitmq import publish_message
+class ValidateTokenAPIView(APIView):
+    def post(self, request):
+        token = request.data.get('token')
+        if not token:
+            return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            decoded = jwt.decode(token, config("JWT_SECRET_KEY"), algorithms=["HS256"])
+            user_id = decoded.get("id")
+
+            # Publish authentication event
+            publish_message("auth_events", {"user_id": user_id, "event": "token_validated"})
+
+            return Response({"user_id": user_id}, status=status.HTTP_200_OK)
+        except jwt.ExpiredSignatureError:
+            return Response({"error": "Token expired"}, status=status.HTTP_401_UNAUTHORIZED)
+        except jwt.InvalidTokenError:
+            return Response({"error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
+```
+
+### 17.5 Consume Events in Post Service
 Create a RabbitMQ Consumer in post_service:
 
 ```
@@ -678,7 +701,7 @@ class Command(BaseCommand):
         channel.start_consuming()
 ```
 
-### 17.5. Start the RabbitMQ Consumer
+### 17.6 Start the RabbitMQ Consumer
 Register app on settings
 
 ```
