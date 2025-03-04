@@ -397,8 +397,10 @@ class PostSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = '__all__'
+```
 
 ### 14.3 Create Views
+```
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -525,7 +527,7 @@ Run:
 python manage.py collectstatic
 ```
 
-### 15. Create a Token Validation Endpoint in user-service
+## 15. Create a Token Validation Endpoint in user-service
 In user-service/views.py:
 
 ```
@@ -551,7 +553,7 @@ urlpatterns = [
 ]
 ```
 
-### 16. Calls user-service to Validate JWT
+## 16. Calls user-service to Validate JWT
 Modify utils/auth_utils.py in post-service
 ```
 from decouple import config
@@ -576,4 +578,50 @@ def get_authenticated_user_id(request):
     return None
 ```
 
-### 17. Implement Event-Driven Architecture with RabbitMQ
+## 17. Implement Event-Driven Architecture with RabbitMQ
+### 17.1 Set Up RabbitMQ with CloudAMQP
+1. Sign up at CloudAMQP and create a free plan instance.
+2. Get your AMQP URL from the CloudAMQP dashboard.
+
+### 17.2 Install Required Libraries
+```
+pip install pika
+```
+
+### 17.3. Configure RabbitMQ Connection
+Create a config.py file or add to .env:
+
+```
+CLOUDAMQP_URL=amqps://your_username:your_password@your_rabbitmq_url/your_vhost
+```
+
+Then, create a utility to connect to RabbitMQ:
+
+```
+# user_service/utils/rabbitmq.py
+import pika
+import json
+from decouple import config
+
+RABBITMQ_URL = config("CLOUDAMQP_URL")
+
+def get_rabbitmq_connection():
+    params = pika.URLParameters(RABBITMQ_URL)
+    return pika.BlockingConnection(params)
+
+def publish_message(queue_name, message):
+    connection = get_rabbitmq_connection()
+    channel = connection.channel()
+    channel.queue_declare(queue=queue_name, durable=True)
+    
+    channel.basic_publish(
+        exchange="",
+        routing_key=queue_name,
+        body=json.dumps(message),
+        properties=pika.BasicProperties(
+            delivery_mode=2,  # Make message persistent
+        )
+    )
+
+    connection.close()
+```
