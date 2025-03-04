@@ -20,16 +20,16 @@ drf-microservices/
   |-- README.md  
 ```
 
-To Run microservice 1
+To Run open two terminals:
 ```
-drf-microservices\user_service
+# Terminal 1 (user_service)
+cd drf-microservices/user_service
 python manage.py runserver 8000
-```
 
-To Run Run microservice 2
-```
-drf-microservices\post_service>
+# Terminal 2 (post_service)
+cd drf-microservices/post_service
 python manage.py runserver 8001
+python manage.py consume_auth_events
 ```
 
 ## 1. Set Up a Virtual Environment on Windows
