@@ -524,3 +524,56 @@ Run:
 ```
 python manage.py collectstatic
 ```
+
+### 15. Create a Token Validation Endpoint in user-service
+In user-service/views.py:
+
+```
+class ValidateTokenAPIView(APIView):
+    def post(self, request):
+        token = request.data.get('token')
+        if not token:
+            return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            decoded = jwt.decode(token, config('JWT_SECRET_KEY'), algorithms=["HS256"])
+            return Response({"user_id": decoded.get("id")}, status=status.HTTP_200_OK)
+        except jwt.ExpiredSignatureError:
+            return Response({"error": "Token expired"}, status=status.HTTP_401_UNAUTHORIZED)
+        except jwt.InvalidTokenError:
+            return Response({"error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
+```
+
+Expose it via user-service/urls.py:
+```
+urlpatterns = [
+    path('api/auth/validate/', validate_token),
+]
+```
+
+### 16. Calls user-service to Validate JWT
+Modify utils/auth_utils.py in post-service
+```
+from decouple import config
+import requests
+from django.conf import settings
+
+USER_SERVICE_URL = config('USER_SERVICE_URL') + "/auth/validate/"
+
+def get_authenticated_user_id(request):
+    auth_header = request.META.get('HTTP_AUTHORIZATION')
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return None
+
+    token = auth_header[7:]  # Extract token
+    try:
+        response = requests.post(USER_SERVICE_URL, json={"token": token}, timeout=5)
+        if response.status_code == 200:
+            return response.json().get("user_id")
+    except requests.RequestException:
+        return None
+
+    return None
+```
+
+### 17. Implement Event-Driven Architecture with RabbitMQ
