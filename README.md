@@ -610,6 +610,7 @@ CLOUDAMQP_URL=amqps://your_username:your_password@your_rabbitmq_url/your_vhost
 Then, create a utility to connect to RabbitMQ:
 
 ```
+#user/utils/rabbitmq.py
 import pika
 import json
 from decouple import config
