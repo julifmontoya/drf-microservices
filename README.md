@@ -1,14 +1,28 @@
 # Microservices Architecture Implementation with Django
 
-This tutorial guides you through setting up a Django-based microservices architecture. We'll cover environment setup, package management, project creation, and essential configurations.
+This tutorial guides you through setting up a Django-based microservices architecture. We will cover environment setup, package management, project creation, and essential configurations.
 
 Example Folder Structure
-
+```
+drf-microservices/
+  |-- user_service/
+  |    |-- users/
+  |    |-- user_service/
+  |    |-- manage.py
+  |    |-- .env
+  |    |-- requirements.txt
+  |    |-- Dockerfile
+```
 
 ## 1. Set Up a Virtual Environment on Windows
 ```
 python -m venv env
 env\Scripts\activate
+deactivate
+```
+
+To deactivate:
+```
 deactivate
 ```
 
@@ -22,13 +36,13 @@ pip install djangorestframework python-decouple django-cors-headers gunicorn psy
 pip freeze > requirements.txt
 ```
 
-## 4. Create a Django Project #1
+## 4. Create a Django Project
 ```
 django-admin startproject user_service
 cd user_service
 ```
 
-## 5. Create a Django App #1
+## 5. Create a Django App
 ```
 python manage.py startapp users
 ```
@@ -38,9 +52,9 @@ Create a .env file to store environment variables:
 ```
 SECRET_KEY=
 DEBUG=False
+JWT_SECRET_KEY=
 ```
 
-## 7. Configure settings.py to Use python-decouple
 Modify settings.py to load environment variables securely:
 ```
 import os
@@ -53,7 +67,7 @@ SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 ```
 
-## 8. Register Installed Apps and Middleware
+## 7. Register Installed Apps and Middleware
 Update settings.py to include the necessary configurations:
 
 ```
@@ -63,8 +77,8 @@ CORS_ALLOW_ALL_ORIGINS = True
 INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
-    'corsheaders',
-    'user',
+    'corsheaders',    
+    'user', # Name of the app
 ]
 
 MIDDLEWARE = [
@@ -73,8 +87,8 @@ MIDDLEWARE = [
 ]
 ```
 
-## 9. Designing the User Service
-### 9.1 Define the User Model
+## 8. Designing the User Service
+### 8.1 Create a Custom User Model
 Extend Django’s built-in AbstractUser model to customize the user schema:
 
 ```
@@ -142,6 +156,7 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': False,
+    "SIGNING_KEY": config('JWT_SECRET_KEY'),
     'ALGORITHM': 'HS256',
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'id',
@@ -154,7 +169,7 @@ python manage.py makemigrations
 python manage.py migrate
 ```
 
-### 9.2 Create Serializers
+### 8.2 Create Serializers
 ```
 # user/serializers.py
 from rest_framework import serializers
@@ -182,11 +197,6 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     def get_token(cls, user):
         token = super().get_token(user)
         token['email'] = user.email
-        # try:
-        #     prov=Provider.objects.get(user=user)
-        #     token['prov'] = str(prov.id)
-        # except Provider.DoesNotExist:
-        #     token['prov'] = ""
         return token
 
     def validate(self, attrs):
@@ -202,7 +212,7 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
             return data
 ```
 
-### 9.3 Create Views
+### 8.3 Create Views
 ```
 # user/views.py
 from rest_framework import status
@@ -248,7 +258,7 @@ class BlacklistRefreshView(APIView):
         return Response("Success")
 ```
 
-### 9.4 Add URL Patterns
+### 8.4 Add URL Patterns
 ```
 # user/urls.py
 from django.urls import path
@@ -261,7 +271,6 @@ urlpatterns = [
 ]
 ```
 
-
 ```
 # user_service/urls.py
 from django.contrib import admin
@@ -273,7 +282,7 @@ urlpatterns = [
 ]
 ```
 
-### 9.5 Add user to Admin
+### 8.5 Add user to Admin
 ```
 # user/admin.py
 from django.contrib import admin
@@ -282,13 +291,26 @@ from. models import User
 admin.site.register(User)
 ```
 
-### 9.6 Superuser + collectstatic
+Create a superuser:
 ```
 python manage.py createsuperuser
+```
+
+### 8.6 Serve Static and Media Files
+Update settings.py
+```
+STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
+MEDIA_URL = '/media/'
+```
+
+Run:
+```
 python manage.py collectstatic
 ```
 
-### 9.7  Use Docker for Containerization
+### 8.6  Use Docker for Containerization
 ```
 # Use an official Python runtime as a parent image
 FROM python:3.12-slim
@@ -314,27 +336,29 @@ EXPOSE 8000
 CMD ["gunicorn", "core.wsgi:application", "--bind", "0.0.0.0:8000"]
 ```
 
-## 10. Go to drf-microservices
+## 9. Navigate to the drf-microservices directory
+```
 cd..
+```
 
-## 11. Create a Django Project #2
+## 10. Create a Django 
 ```
 django-admin startproject post_service
 cd post_service
 ```
 
-## 12. Create a Django App #2
+## 11. Create a Django App
 ```
 python manage.py startapp post
 ```
 
-## 13. Repeat steap 1,2,3,6,7,8
-Set Up a Virtual Environment on Windows
-Install Required Packages
-Save Dependencies to a Requirements File
-Set Up an .env File
-Configure settings.py to Use python-decouple
-Register Installed Apps and Middleware with corsheaders & post
+## 13. Repeat step 1,2,3,6,7
+- Set Up a Virtual Environment on Windows
+- Install Required Packages
+- Save Dependencies to a Requirements File
+- Set Up an .env File
+- Configure settings.py to Use python-decouple
+- Register Installed Apps and Middleware with corsheaders & post app
 
 ## 14. Designing the Post Service
 ### 14.1 Define the Post Model
