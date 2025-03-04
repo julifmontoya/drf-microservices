@@ -13,7 +13,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.db import IntegrityError
 import jwt
 from decouple import config
-
+from .utils.rabbitmq import publish_message
 
 class LoginView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
@@ -54,8 +54,13 @@ class ValidateTokenAPIView(APIView):
             return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            decoded = jwt.decode(token, config('JWT_SECRET_KEY'), algorithms=["HS256"])
-            return Response({"user_id": decoded.get("id")}, status=status.HTTP_200_OK)
+            decoded = jwt.decode(token, config("JWT_SECRET_KEY"), algorithms=["HS256"])
+            user_id = decoded.get("id")
+
+            # Publish authentication event
+            publish_message("auth_events", {"user_id": user_id, "event": "token_validated"})
+
+            return Response({"user_id": user_id}, status=status.HTTP_200_OK)
         except jwt.ExpiredSignatureError:
             return Response({"error": "Token expired"}, status=status.HTTP_401_UNAUTHORIZED)
         except jwt.InvalidTokenError:

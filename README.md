@@ -20,6 +20,18 @@ drf-microservices/
   |-- README.md  
 ```
 
+To Run microservice 1
+```
+drf-microservices\user_service
+python manage.py runserver 8000
+```
+
+To Run Run microservice 2
+```
+drf-microservices\post_service>
+python manage.py runserver 8001
+```
+
 ## 1. Set Up a Virtual Environment on Windows
 ```
 python -m venv env
@@ -589,7 +601,7 @@ pip install pika
 ```
 
 ### 17.3. Configure RabbitMQ Connection
-Create a config.py file or add to .env:
+add to .env:
 
 ```
 CLOUDAMQP_URL=amqps://your_username:your_password@your_rabbitmq_url/your_vhost
