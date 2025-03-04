@@ -387,6 +387,7 @@ class Post(models.Model):
 ```
 
 ### 14.2 Create Serializers
+```
 # post/serializers.py
 from rest_framework import serializers
 from post.models import Post
@@ -458,7 +459,7 @@ class PostDetailProv(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+```
 
 ### 14.4 Add URL Patterns
 Include the post app's URLs in the main post_service/urls.py.
