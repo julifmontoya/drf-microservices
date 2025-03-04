@@ -11,6 +11,8 @@ from django.conf import settings
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db import IntegrityError
+import jwt
+from decouple import config
 
 
 class LoginView(TokenObtainPairView):
@@ -37,8 +39,24 @@ class ProviderCreate(CreateAPIView):
         except IntegrityError:
             return Response({'error': 'There is already a registered user with this email'}, status=status.HTTP_400_BAD_REQUEST)
 
+
 class BlacklistRefreshView(APIView):
     def post(self, request):
         token = RefreshToken(request.data.get('refresh'))
         token.blacklist()
         return Response("Success")
+
+
+class ValidateTokenAPIView(APIView):
+    def post(self, request):
+        token = request.data.get('token')
+        if not token:
+            return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            decoded = jwt.decode(token, config('JWT_SECRET_KEY'), algorithms=["HS256"])
+            return Response({"user_id": decoded.get("id")}, status=status.HTTP_200_OK)
+        except jwt.ExpiredSignatureError:
+            return Response({"error": "Token expired"}, status=status.HTTP_401_UNAUTHORIZED)
+        except jwt.InvalidTokenError:
+            return Response({"error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)

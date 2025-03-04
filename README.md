@@ -2,6 +2,9 @@
 
 This tutorial guides you through setting up a Django-based microservices architecture. We'll cover environment setup, package management, project creation, and essential configurations.
 
+Example Folder Structure
+
+
 ## 1. Set Up a Virtual Environment on Windows
 ```
 python -m venv env
@@ -71,7 +74,6 @@ MIDDLEWARE = [
 ```
 
 ## 9. Designing the User Service
-
 ### 9.1 Define the User Model
 Extend Django’s built-in AbstractUser model to customize the user schema:
 
@@ -280,8 +282,124 @@ from. models import User
 admin.site.register(User)
 ```
 
-### 9.6 Superuser+collectstatic
+### 9.6 Superuser + collectstatic
 ```
 python manage.py createsuperuser
 python manage.py collectstatic
+```
+
+### 9.7  Use Docker for Containerization
+```
+# Use an official Python runtime as a parent image
+FROM python:3.12-slim
+
+# Set environment variables (optional)
+ENV PYTHONUNBUFFERED=1
+
+# Set the working directory in the container
+WORKDIR /app
+
+COPY requirements.txt .
+
+# Install dependencies in a single step (reduces layer size)
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+# Copy the rest of the application
+COPY . .
+
+# Expose the port the app runs on
+EXPOSE 8000
+
+# Start the Django app using Gunicorn
+CMD ["gunicorn", "core.wsgi:application", "--bind", "0.0.0.0:8000"]
+```
+
+## 10. Go to drf-microservices
+cd..
+
+## 11. Create a Django Project #2
+```
+django-admin startproject post_service
+cd post_service
+```
+
+## 12. Create a Django App #2
+```
+python manage.py startapp post
+```
+
+## 13. Repeat steap 1,2,3,6,7,8
+Set Up a Virtual Environment on Windows
+Install Required Packages
+Save Dependencies to a Requirements File
+Set Up an .env File
+Configure settings.py to Use python-decouple
+Register Installed Apps and Middleware with corsheaders & post
+
+## 14. Designing the Post Service
+### 14.1 Define the Post Model
+```
+import uuid
+from django.db import models
+
+class Post(models.Model):
+    id = models.UUIDField(default=uuid.uuid4, unique=True, primary_key=True, editable=False)
+    user_id = models.UUIDField()  # Storing only the user ID, not a direct FK
+    title = models.CharField(max_length=100, blank=False)
+    description = models.TextField(null=True, blank=True)
+    created = models.DateField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        ordering = ['title']
+```
+
+### Create Views
+
+
+
+### Register Models in Admin
+Ensure the Post and Category models are available in Django Admin.
+```
+# post/admin.py
+from django.contrib import admin
+from post.models import Post
+
+admin.site.register(Post)
+```
+
+###  Add URL Patterns
+Include the post app's URLs in the main post_service/urls.py.
+
+```
+# post/urls.py
+from django.urls import path
+from post.views import PostListProv, PostCreateProv, PostDetailProv
+
+urlpatterns = [
+    path('affiliate/posts/', PostListProv.as_view()),
+    path('affiliate/posts/create/', PostCreateProv.as_view()),
+    path('affiliate/posts/<id>/', PostDetailProv.as_view()),
+]
+```
+
+```
+# post_service/urls.py
+from django.conf import settings
+from django.contrib import admin
+from django.urls import path, include
+from django.views.static import serve
+from django.urls import re_path
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('v1/', include('post.urls')),
+]
+
+urlpatterns += [
+    re_path(r'^media/(?P<path>.*)$', serve,{'document_root': settings.MEDIA_ROOT}),
+    re_path(r'^static/(?P<path>.*)$', serve,{'document_root': settings.STATIC_ROOT}),
+]
 ```
