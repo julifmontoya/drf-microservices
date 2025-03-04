@@ -17,8 +17,7 @@ drf-microservices/
   |    |-- manage.py
   |    |-- .env
   |    |-- requirements.txt
-  |
-|-- README.md  
+  |-- README.md  
 ```
 
 ## 1. Set Up a Virtual Environment on Windows
