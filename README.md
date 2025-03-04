@@ -610,7 +610,6 @@ CLOUDAMQP_URL=amqps://your_username:your_password@your_rabbitmq_url/your_vhost
 Then, create a utility to connect to RabbitMQ:
 
 ```
-# user_service/utils/rabbitmq.py
 import pika
 import json
 from decouple import config
@@ -636,4 +635,59 @@ def publish_message(queue_name, message):
     )
 
     connection.close()
+```
+
+### 17.4. Consume Events in Post Service
+Create a RabbitMQ Consumer in post_service:
+
+```
+# post_management/commands/consume_auth_events.py
+from django.core.management.base import BaseCommand
+import pika
+import json
+from django.core.cache import cache
+from decouple import config
+
+RABBITMQ_URL = config("CLOUDAMQP_URL")
+
+class Command(BaseCommand):
+    help = "Starts RabbitMQ consumer for authentication events"
+
+    def handle(self, *args, **kwargs):
+        def callback(ch, method, properties, body):
+            message = json.loads(body)
+            print(f"Received authentication event: {message}")
+
+            # Process the received event by performing any necessary action.
+            # In this case, we store the user authentication event in cache (e.g., for 5 minutes).
+            user_id = message.get("user_id")
+            if user_id:
+                cache.set(f"user_auth_{user_id}", True, timeout=300)
+
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+
+        params = pika.URLParameters(RABBITMQ_URL)
+        connection = pika.BlockingConnection(params)
+        channel = connection.channel()
+
+        channel.queue_declare(queue="auth_events", durable=True)
+        channel.basic_consume(queue="auth_events", on_message_callback=callback)
+
+        print("Waiting for messages...")
+        channel.start_consuming()
+```
+
+### 17.5. Start the RabbitMQ Consumer
+Register app on settings
+
+```
+INSTALLED_APPS = [
+    "post_management"
+]
+```
+
+Run the consumer before starting the Django API:
+```
+cd drf-microservices/post_service
+python manage.py consume_auth_events
 ```
